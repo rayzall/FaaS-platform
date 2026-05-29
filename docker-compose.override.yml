@@ -5,27 +5,29 @@
 services:
   api-gateway:
     build:
-      context: ./apps/api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
       target: builder
-    command: npx ts-node-dev --respawn --transpile-only src/index.ts
+    command: sh -c "npx prisma generate && npx ts-node-dev --respawn --transpile-only apps/api-gateway/src/index.ts"
     environment:
       - NODE_ENV=development
       - LOG_LEVEL=debug
     volumes:
-      - ./apps/api-gateway/src:/app/src:ro
+      - ./apps/api-gateway/src:/app/apps/api-gateway/src:ro
+      - ./apps/api-gateway/prisma:/app/apps/api-gateway/prisma:ro
       - ./packages/shared-types/src:/app/packages/shared-types/src:ro
+    working_dir: /app/apps/api-gateway
     ports:
       - "3001:3001"
 
   frontend:
     build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/frontend/Dockerfile
       target: builder
-    command: npm run dev -- --host 0.0.0.0
+    command: npm run dev --workspace=apps/frontend -- --host 0.0.0.0
     volumes:
-      - ./apps/frontend/src:/app/src:ro
+      - ./apps/frontend/src:/app/apps/frontend/src:ro
     ports:
       - "3000:3000"
 

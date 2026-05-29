@@ -38,8 +38,8 @@ services:
   # ─── Frontend ───────────────────────────────────────────────
   frontend:
     build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/frontend/Dockerfile
     container_name: faas-frontend
     networks:
       - faas-net
@@ -48,8 +48,8 @@ services:
   # ─── API Gateway ────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./apps/api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
     container_name: faas-api-gateway
     environment:
       - NODE_ENV=production

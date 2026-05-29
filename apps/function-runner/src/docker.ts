@@ -5,11 +5,53 @@ import path from 'path';
 import fs from 'fs';
 import tar from 'tar-fs';
 
-export const docker = new Docker({
-  socketPath: process.platform === 'win32'
-    ? '//./pipe/docker_engine'
-    : config.dockerSocket,
-});
+/**
+ * Build a dockerode connection from env config, OS-aware.
+ *
+ * Priority:
+ *   1. DOCKER_HOST=tcp://host:port  → TCP transport
+ *   2. DOCKER_SOCKET                → Unix socket or Windows named pipe
+ *   3. Platform default             → Windows pipe / unix socket
+ */
+function buildDockerOptions(): Docker.DockerOptions {
+  const host = config.dockerHost.trim();
+  if (host) {
+    try {
+      const url = new URL(host);
+      const opts: Docker.DockerOptions = {
+        host: url.hostname,
+        port: url.port ? parseInt(url.port, 10) : 2375,
+        protocol: (url.protocol.replace(':', '') as 'http' | 'https') || 'http',
+      };
+      logger.info({ host: opts.host, port: opts.port, protocol: opts.protocol }, 'Docker: TCP connection');
+      return opts;
+    } catch (err) {
+      logger.warn({ err, dockerHost: host }, 'Invalid DOCKER_HOST, falling back to socket');
+    }
+  }
+  logger.info({ socketPath: config.dockerSocket }, 'Docker: socket connection');
+  return { socketPath: config.dockerSocket };
+}
+
+export const docker = new Docker(buildDockerOptions());
+
+/**
+ * Verify connectivity to the Docker daemon. Logs and rethrows on failure
+ * so callers can decide whether to exit or degrade.
+ */
+export async function pingDocker(): Promise<void> {
+  try {
+    await docker.ping();
+    const info = await docker.version();
+    logger.info(
+      { version: info.Version, apiVersion: info.ApiVersion, os: info.Os },
+      'Docker daemon reachable'
+    );
+  } catch (err) {
+    logger.error({ err }, 'Docker daemon unreachable — is Docker Desktop running?');
+    throw err;
+  }
+}
 
 export interface FunctionContainer {
   id: string;

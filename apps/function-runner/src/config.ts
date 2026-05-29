@@ -1,9 +1,17 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const isWin = process.platform === 'win32';
+
 export const config = {
   port: parseInt(process.env.PORT || '8080', 10),
-  dockerSocket: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
+  // Docker engine connection
+  // - DOCKER_HOST takes precedence (e.g. "tcp://127.0.0.1:2375")
+  // - else DOCKER_SOCKET (Windows named pipe or Unix socket)
+  // - else platform default
+  dockerHost:   process.env.DOCKER_HOST || '',
+  dockerSocket: process.env.DOCKER_SOCKET
+    || (isWin ? '//./pipe/docker_engine' : '/var/run/docker.sock'),
   networkName: process.env.FUNCTION_NETWORK || 'faas-platform_faas-fn',
   functionImagePrefix: process.env.FUNCTION_IMAGE_PREFIX || 'faas-fn',
   functionMemoryMb: parseInt(process.env.FUNCTION_MEMORY_MB || '128', 10),

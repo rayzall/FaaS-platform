@@ -34,6 +34,7 @@ import {
   listFunctionContainers,
   getContainerLogs,
   scaleFunctionContainer,
+  pingDocker,
 } from './docker';
 
 const app = express();
@@ -239,9 +240,19 @@ const server = http.createServer(app);
 
 loadRegistry();
 
-server.listen(config.port, () => {
-  logger.info({ port: config.port }, '🚀 FaaS Function Runner started');
-});
+async function start() {
+  try {
+    await pingDocker();
+  } catch {
+    logger.error('Docker daemon not reachable; refusing to start function-runner');
+    process.exit(1);
+  }
+  server.listen(config.port, () => {
+    logger.info({ port: config.port }, '🚀 FaaS Function Runner started');
+  });
+}
+
+void start();
 
 process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
 process.on('SIGINT',  () => { server.close(() => process.exit(0)); });

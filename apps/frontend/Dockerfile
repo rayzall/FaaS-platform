@@ -7,7 +7,7 @@ COPY package*.json ./
 COPY apps/frontend/package*.json ./apps/frontend/
 COPY packages/shared-types/package*.json ./packages/shared-types/
 
-RUN npm ci --workspace=apps/frontend --workspace=packages/shared-types
+RUN npm ci --workspace=apps/frontend --workspace=packages/shared-types --include-workspace-root
 
 COPY packages/shared-types ./packages/shared-types
 COPY apps/frontend ./apps/frontend

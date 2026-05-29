@@ -16,7 +16,30 @@ import path from 'path';
 import fs from 'fs/promises';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-const docker = new Docker({ socketPath: process.env.DOCKER_SOCKET || '/var/run/docker.sock' });
+
+/**
+ * Build a dockerode connection from env, OS-aware.
+ *  - DOCKER_HOST=tcp://host:port  → remote/TCP daemon
+ *  - else on Windows              → named pipe (Docker Desktop)
+ *  - else                         → unix socket
+ */
+function createDockerClient(): Docker {
+  const host = process.env.DOCKER_HOST?.trim();
+  if (host && host.startsWith('tcp://')) {
+    const url = new URL(host);
+    return new Docker({
+      host: url.hostname,
+      port: parseInt(url.port || '2375', 10),
+      protocol: 'http',
+    });
+  }
+  const socketPath =
+    process.env.DOCKER_SOCKET ||
+    (process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock');
+  return new Docker({ socketPath });
+}
+
+const docker = createDockerClient();
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const REGISTRY   = process.env.DOCKER_REGISTRY || 'localhost:5000';
@@ -133,4 +156,22 @@ buildQueue.on('failed', (job, err) => {
   logger.error({ jobId: job.id, err: err.message }, 'Build job failed');
 });
 
-logger.info({ redis: REDIS_URL, registry: REGISTRY }, '🔨 Function Manager started');
+async function pingDocker(): Promise<void> {
+  try {
+    await docker.ping();
+    const v = await docker.version();
+    logger.info({ version: v.Version, apiVersion: v.ApiVersion, os: v.Os }, 'Docker daemon reachable');
+  } catch (err) {
+    logger.error({ err }, 'Docker daemon unreachable — is Docker Desktop running?');
+    throw err;
+  }
+}
+
+void (async () => {
+  try {
+    await pingDocker();
+  } catch {
+    process.exit(1);
+  }
+  logger.info({ redis: REDIS_URL, registry: REGISTRY }, '🔨 Function Manager started');
+})();
